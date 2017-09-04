@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import glob
 from scipy import stats
 
+
 category_full_names = {'vbd':'very big drop', 'bd':'big drop', 'md':'medium drop', 'sd':'small drop',
                        'vbg':'very big gain', 'bg':'big gain', 'mg':'medium gain', 'sg':'small gain'}
 
