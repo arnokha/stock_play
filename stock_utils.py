@@ -174,7 +174,7 @@ def plot_two_day_probability_bar_graph(previous_day, count, two_day_trends, cat_
 		all_categories = ['bd', 'sd', 'sg', 'bg']
 	for next_day in all_categories:
 		two_day_name = previous_day +'_' + next_day
-		two_day_count = count_two_day_trends(two_day_trends, two_day_name)
+		two_day_count = count_trends(two_day_trends, two_day_name)
 		two_day_prob = two_day_count / count
 		two_day_probs.append(two_day_prob)
 
@@ -198,3 +198,249 @@ def plot_two_day_probability_bar_graph(previous_day, count, two_day_trends, cat_
 	plt.xticks(ind+width, categories)
 	plt.legend()
 	#plt.show()
+
+#######################
+## Practice 10
+#######################
+def run_random_walks(starting_value, stride_length, p, n_steps, n_trials):
+	"""
+	Run 1D random walks with the following parameters:
+	  starting_value -- Value on the number line at which to start the random walk
+	  stride_length  -- Size of our steps in either direction
+	  p              -- Probability of success
+	  n_trials       -- Number of trials to run
+	  n_steps        -- Number of steps to take on our random walk
+	  
+	NOTE: 0 will be an absorbing state. Meaning that if we hit 0 we're stuck there
+
+	Returns the trial_results, which contains the results of each random walk
+	"""
+	trial_results = []
+
+	for i in range(n_trials):
+		values = []
+		value = starting_value
+		for j in range(n_steps):
+			values.append(value)
+			if (value <= 0):
+				value = 0
+			elif (random.random() < p):
+				value += stride_length
+			else:
+				value -= stride_length
+		trial_results.append(values)
+
+	return trial_results
+
+def run_random_walks_kelly(starting_value, p, n_steps, n_trials):
+	"""
+	Run 1D random walks with the following parameters:
+	  starting_value -- Value on the number line at which to start the random walk
+	  stride_length  -- Size of our steps in either direction
+	  p              -- Probability of success
+	  n_trials       -- Number of trials to run
+	  n_steps        -- Number of steps to take on our random walk
+	  
+	NOTE: 0 will be an absorbing state. Meaning that if we hit 0 we're stuck there
+	
+	Returns the trial_results, which contains the results of each random walk
+	"""
+	trial_results = []
+
+	for i in range(n_trials):
+		values = []
+		value = starting_value
+		for j in range(n_steps):
+			values.append(value)
+			stride_length = int((2 * p - 1) * value) ## Kelly
+			if (value <= 0):
+				value = 0
+			elif (random.random() < p):
+				value += stride_length
+			else:
+				value -= stride_length
+		trial_results.append(values)
+
+	return trial_results
+
+def run_gaussian_random_walks(starting_value, mu, sigma, n_steps, n_trials):
+	"""
+	Run 1D random gaussian walks with the following parameters:
+	  starting_value -- Value on the number line at which to start the random walk
+	  mu             -- Average percent value of stride length
+	  sigma          -- Average percent standard deviation
+	  n_trials       -- Number of trials to run
+	  n_steps        -- Number of steps to take on our random walk
+	  
+	NOTE: 0 will be an absorbing state. Meaning that if we hit 0 we're stuck there
+	
+	Returns the trial_results, which contains the results of each random walk
+	We are assuming no "edge" to tilt things in our favor
+	"""
+	trial_results = []
+
+	for i in range(n_trials):
+		step_multipliers = np.random.normal(mu, sigma, n_steps) / 100
+		values = []
+		value = starting_value
+		for j in range(n_steps):
+			values.append(value)
+			if (value <= 0):
+				value = 0
+			value = value + step_multipliers[j] * value
+		trial_results.append(values)
+
+	step_multipliers
+	return trial_results
+
+def categorize_movement(movement, mu, sigma, n_cats=4):
+	if not (n_cats == 4):
+		raise ValueError('Only 4 categories supported at this time')
+
+	if (movement <= (mu - sigma)):
+		category = 'bd'  ## big drop
+	elif (movement <= mu):
+		category = 'sd'  ## small drop
+	elif (movement >= (mu + sigma)):
+		category = 'bg'  ## big gain
+	elif (movement >= mu):
+		category = 'sg'  ## small gain
+
+	return category
+
+def choose_category(labels, probabilities):
+	num = np.random.rand(1)[0]
+	for i in range(len(probabilities)):
+		num = num - probabilities[i]
+		if num <= 0:
+			return labels[i]
+		
+	## Probabilities didn't sum perfectly to one
+	return np.random.choice(labels, 1)[0]
+
+def generate_next_two_day_step(previous_step, two_day_probs, mu, sigma):
+	conditional_probabilities = {'bd':two_day_probs[0:4], 
+								 'sd':two_day_probs[4:8],
+								 'sg':two_day_probs[8:12],
+								 'bg':two_day_probs[12:16]}
+	conditional_probability = conditional_probabilities[categorize_movement(previous_step, mu, sigma)]
+	
+	choice = choose_category(['bd', 'sd', 'sg', 'bg'], conditional_probability)
+	
+	random_samples = np.random.normal(mu, sigma, 1000)
+	
+	## Draw on random samples until we get a result of the correct category
+	for i in range(len(random_samples)):
+		if (categorize_movement(random_samples[i], mu, sigma) == choice):
+			#print(choice)
+			#print(random_samples[i])
+			return random_samples[i]
+		
+	## Very unlikely to happen, but will catch in the case none of the samples have the category we're looking for
+	return 0
+
+def get_probabilities(two_day_trends, categories, n_categories=4):
+	two_day_probs = []
+	if (n_categories == 4):
+		all_categories = ['bd', 'sd', 'sg', 'bg']
+	else:
+		raise ValueError('Only four categories are supported at this time')
+		
+	for first_day in all_categories:
+		first_day_count = count_movement_category(categories, first_day)
+		for next_day in all_categories:
+			two_day_name = first_day +'_' + next_day
+			two_day_count = count_trends(two_day_trends, two_day_name)
+			two_day_prob = two_day_count / first_day_count
+			two_day_probs.append(two_day_prob)
+
+	return two_day_probs
+
+def run_two_day_momentum_simulation(prior_daily_movements, starting_value, mu, sigma, n_steps, n_trials):
+	## Get categories and trends
+	prior_movement_categories = categorize_movements(prior_daily_movements, n_cats=4)
+	prior_two_day_trends = get_two_day_trends(prior_movement_categories)
+	two_day_probs = get_probabilities(prior_two_day_trends, prior_movement_categories)
+	
+	trials = []
+	for i in range(n_trials):
+		first_step = generate_next_two_day_step(prior_daily_movements[-1], two_day_probs, mu, sigma)
+		#print(first_step)
+		steps = [first_step]
+
+		for i in range(n_steps - 1):
+			steps.append(generate_next_two_day_step(steps[i], two_day_probs, mu, sigma))
+		
+		trials.append(simulate_movements(steps, starting_value))
+
+	return trials
+
+def get_three_day_probabilities(three_day_trends, two_day_name, categories, n_categories=4):
+	"""Returns the probability distribution for the third day given the previous two"""
+	two_day_probs = []
+	if (n_categories == 4):
+		all_categories = ['bd', 'sd', 'sg', 'bg']
+	else:
+		raise ValueError('Only four categories are supported at this time')
+		
+	three_day_counts = []
+	total = 0
+	for next_day in all_categories:
+		three_day_name = two_day_name + '_' + next_day
+		three_day_count = count_trends(three_day_trends, three_day_name)
+		total += three_day_count
+		three_day_counts.append(three_day_count)
+
+	three_day_probs = []
+	[three_day_probs.append(three_day_counts[i] / total) for i in range(len(three_day_counts))]
+	return three_day_probs
+
+def generate_next_three_day_step(step_before_last, previous_step, three_day_probability, mu, sigma):
+	two_day_name = categorize_movement(step_before_last, mu, sigma) + '_' + categorize_movement(previous_step, mu, sigma)
+	choice = choose_category(['bd', 'sd', 'sg', 'bg'], three_day_probability)
+	random_samples = np.random.normal(mu, sigma, 1000)
+	
+	## Draw on random samples until we get a result of the correct category
+	for i in range(len(random_samples)):
+		if (categorize_movement(random_samples[i], mu, sigma) == choice):
+			return random_samples[i]
+		
+	## Very unlikely to happen, but will catch in the case none of the samples have the category we're looking for
+	return 0
+
+def run_three_day_momentum_simulation(prior_daily_movements, starting_value, mu, sigma, n_steps, n_trials):
+	## Get categories and trends
+	prior_movement_categories = categorize_movements(prior_daily_movements, n_cats=4)
+	prior_three_day_trends = get_three_day_trends(prior_movement_categories)
+	
+	trials = []
+	
+	## Collect a dictionay of three day probabilities
+	all_categories = ['bd', 'sd', 'sg', 'bg']
+	three_day_probs = {}
+	for first_day in all_categories:
+		for next_day in all_categories:
+			two_day_name = first_day + '_' + next_day
+			three_day_probs[two_day_name] = get_three_day_probabilities(prior_three_day_trends, two_day_name, prior_movement_categories)
+	
+	## Generate steps based on the movements of the prior two days
+	for i in range(n_trials):
+		two_day_name = categorize_movement(prior_daily_movements[-2], mu, sigma) + '_' + categorize_movement(prior_daily_movements[-1], mu, sigma)
+		three_day_prob = three_day_probs[two_day_name]
+		first_step = generate_next_three_day_step(prior_daily_movements[-2], prior_daily_movements[-1], three_day_prob, mu, sigma)
+		
+		two_day_name = categorize_movement(prior_daily_movements[-2], mu, sigma) + '_' + categorize_movement(prior_daily_movements[-1], mu, sigma)
+		three_day_prob = three_day_probs[two_day_name]
+		second_step = generate_next_three_day_step(prior_daily_movements[-1], first_step, three_day_prob, mu, sigma)
+		
+		steps = [first_step, second_step]
+
+		for i in range(n_steps - 2):
+			two_day_name = categorize_movement(steps[i], mu, sigma) + '_' + categorize_movement(steps[i+1], mu, sigma)
+			three_day_prob = three_day_probs[two_day_name]
+			steps.append(generate_next_three_day_step(steps[i], steps[i+1], three_day_prob, mu, sigma))
+		
+		trials.append(simulate_movements(steps, starting_value))
+
+	return trials
+
