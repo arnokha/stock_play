@@ -3,15 +3,9 @@ Looking at patterns in stock price movements using pricing and volume data.
 
 ### What is this?
 This is a series of notebooks I have created to explore the effects of different technical indicators upon one another.  
-<<<<<<< HEAD
 
 The focus in the earlier notebooks is more on visualization and interpretability than on purely predictive value, since 
 we will likely lose some interpretability in the later notebooks when using boosting algorithms and neural networks. 
-=======
-The focus in the earlier notebooks is more on visualization and interpretability than on purely predictive value.  
-We will likely lose some interpretability in the later notebooks when using boosting algorithms and neural networks, 
-since we will be dealing with higher dimensionality.
->>>>>>> 9246056ed9c0bf8a8ca7581f4808a4459efe397c
 
 ### Why am I doing this?
 While I do not believe these technical indicators provide much predictive value when used separately, 
