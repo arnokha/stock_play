@@ -15,7 +15,8 @@ def ticker_from_csv(csv_string):
 	The downloaded files come in the form [ticker].csv. 
 	We are just stripping off the csv extension and making the ticker uppercase.
 	"""
-	stock_name = csv_string.rsplit('.', 1)[0] ## Peel off the ".csv" from the given string
+	stock_name = csv_string.rsplit('.', 1)[0] ## Peel off the trailing ".csv"
+	stock_name = stock_name.rsplit('/', 1)[1] ## Peel off the the leading directory name
 	return stock_name.upper()
 
 def get_price_movements(df, period=1):
@@ -35,26 +36,29 @@ def get_price_movements(df, period=1):
 
 	return movement
 
-def plot_gaussian(x, x_min=-10, x_max=10, n=10000, fill=False):
+def plot_gaussian(x, x_min=-10, x_max=10, n=10000, fill=False, label=''):
 	"""
 	Expects an np array of movement percentages, 
 	plots the gaussian kernel density estimate
 	"""
-
 	## Learn the kernel-density estimate from the data
 	density = stats.gaussian_kde(x)
-
+	
 	## Evaluate the output on some data points
 	xs = np.linspace(x_min, x_max, n)
 	y = density.evaluate(xs)
-
+	
 	## Create the plot
-	plt.plot(xs, y)
+	if (label != ''):
+		plt.plot(xs, y, label=label)
+	else:
+		plt.plot(xs, y)
 	plt.xlabel('Daily Movement Percentage')
 	plt.ylabel('Density')
-
+	
 	if (fill):
 		plt.fill_between(xs, 0, y)
+
 
 def plot_gaussian_categorical(x, x_min=-10, x_max=10, n=10000, title=''):
 	"""
@@ -138,6 +142,7 @@ def categorize_movements(movements, n_cats=8):
 	return categories
 
 def count_movement_category(categories, cat_to_count):
+	"""Given a list of categories, return a count of a specific category"""
 	count = 0
 	for i in range(len(categories)):
 		if categories[i] == cat_to_count:
@@ -148,6 +153,7 @@ def count_two_day_trends(trends, trend_to_count):
 	raise NameError('Renamed to count_trends')
 
 def count_trends(trends, trend_to_count):
+	"""Given a list of trends, return a count of a specific trend"""
 	count = 0
 	for i in range(len(trends)):
 		if trends[i] == trend_to_count:
@@ -155,18 +161,94 @@ def count_trends(trends, trend_to_count):
 	return count
 
 def get_two_day_trends(categories):
-	two_day_trends = []
-	for i in range(len(categories) - 1):
-		two_day_trends.append(categories[i] + '_' + categories[i+1])
-	return two_day_trends
+	raise NameError('No longer in use; use get_trends() instead')
 
 def get_three_day_trends(categories):
-	three_day_trends = []
-	for i in range(len(categories) - 2):
-		three_day_trends.append(categories[i] + '_' + categories[i+1] + '_' + categories[i+2])
-	return three_day_trends
+	raise NameError('No longer in use; use get_trends() instead')
+
+def get_trends(categories, trend_length):
+	"""
+	Given a list of movement categories and length of the trend we are looking for, 
+	return a list of trends, which is just a underscore seperated concatenation of categories.
+	  e.g. we have categories = ['a', 'b', 'c', 'd'], and trend_length 2, we would get ['a_b', 'b_c', 'c_d' ]
+	  if instead, trend_length was 3, we would have ['a_b_c', 'b_c_d']
+	"""
+	trends = []
+	for i in range(len(categories) - trend_length + 1):
+		trend_string = categories[i]
+		for j in range(trend_length - 1):
+			trend_string += '_' + categories[i+j+1]
+		trends.append(trend_string)
+	return trends
+
+def get_trends_all_stocks(period_length, trend_length, all_category_names, n_cats=8):
+	"""
+	Get an aggregate of trends for all stocks, from a specified period_length (1 would be daily, 7 weekly, etc.),
+	a specified trend_length(2 would be looking for two day trends), and a list all_category_names that contains
+	each possible category name.
+	
+	We return: 
+	  all_trends          -- The aggregate list of all trends accross stocks
+	  all_category_counts -- The aggregate count of each category accross stocks
+	  all_category_probs  -- The probability of each category accross stocks
+	"""
+	g = glob.glob('stock_data/*.csv')
+	
+	all_movements = []
+	all_movement_categories = []
+	all_trends = []
+	
+	all_category_counts = np.zeros(len(all_category_names), dtype=np.int)
+	total_count = 0
+	
+	for i in range(len(g)):
+		df = pd.DataFrame()
+		df = df.from_csv(g[i])
+		
+		movements = get_price_movements(df, period=period_length)
+		movement_categories = categorize_movements(movements, n_cats=n_cats)
+		
+		all_movements.extend(movements)
+		all_movement_categories.extend(movement_categories)
+		
+		for j in range(len(all_category_names)):
+			all_category_counts[j] += count_movement_category(movement_categories, all_category_names[j])
+		
+		trends = get_trends(movement_categories, trend_length)
+		all_trends.extend(trends)
+	
+	all_category_probs = np.zeros(len(all_category_names), dtype=np.float)
+	total_count = len(all_movement_categories)
+	for i in range(len(all_category_names)):
+		all_category_probs[i] = (all_category_counts[i] / total_count)
+
+	return (all_trends, all_category_counts, all_category_probs, all_movement_categories)
+
+def get_category_probabilities(movement_categories, n_cats=4):
+	if n_cats != 4:
+		raise ValueError('Only 4 categories supported at this time')
+
+	bd_count = count_movement_category(movement_categories, 'bd')
+	sd_count = count_movement_category(movement_categories, 'sd')
+	sg_count = count_movement_category(movement_categories, 'sg')
+	bg_count = count_movement_category(movement_categories, 'bg')
+
+	total_cat_count = len(movement_categories)
+
+	p_bd = bd_count / total_cat_count
+	p_sd = sd_count / total_cat_count
+	p_sg = sg_count / total_cat_count
+	p_bg = bg_count / total_cat_count
+
+	category_counts = [bd_count, sd_count, sg_count, bg_count]
+	category_probabilities = [p_bd, p_sd, p_sg, p_bg]
+
+	return category_probabilities
 
 def plot_two_day_probability_bar_graph(previous_day, count, two_day_trends, cat_probs, n_cats=8, show_baseline=True):
+	"""
+	Plot regular probabilities and probabilities conditioned on one event (the previous_day arg)
+	"""
 	two_day_probs = []
 	if (n_cats == 8):
 		all_categories = ['vbd', 'bd', 'md', 'sd', 'sg', 'mg', 'bg', 'vbg']
@@ -198,6 +280,77 @@ def plot_two_day_probability_bar_graph(previous_day, count, two_day_trends, cat_
 	plt.xticks(ind+width, categories)
 	plt.legend()
 	#plt.show()
+
+def plot_three_day_probability_bar_graph(previous_day, two_day_trends, three_day_trends, movement_categories):
+	"""
+	Plot all of the following together on one figure: regular probabilities, probabilities conditioned on
+	one event (the previous_day arg), and probabilities conditioned on two events (the previous_day, and all
+	possible days before the previous_day)
+	"""
+	import matplotlib.patches as mpatches
+	two_day_probs = []
+	three_day_probs = []
+	all_categories = ['bd', 'sd', 'sg', 'bg']
+	cat_count = count_movement_category(movement_categories, previous_day)
+	category_probabilities = get_category_probabilities(movement_categories)
+
+	## Get probabilities after 'previous_day'
+	for next_day in all_categories:
+		two_day_name = previous_day +'_' + next_day
+		two_day_count = count_trends(two_day_trends, two_day_name)
+		two_day_prob = two_day_count / cat_count
+		two_day_probs.append(two_day_prob)
+    
+    ## Get probabilities after 'previous_day' and the day before
+	for next_day in all_categories:
+		for day_before_last in all_categories:  
+			three_day_name = day_before_last +'_' + previous_day +'_' + next_day
+			three_day_count = count_trends(three_day_trends, three_day_name)
+
+			two_day_name = day_before_last +'_' + previous_day
+			############## TEMPORARY -- think of a more elegant solution
+			three_day_total = 0
+			for category in all_categories:
+				three_day_total += count_trends(three_day_trends, two_day_name + '_' + category)
+
+			three_day_prob = three_day_count / three_day_total
+			three_day_probs.append(three_day_prob)
+			#print('Number of times ' + three_day_name + ' appeared is: ' + str(three_day_count))
+
+	fig = plt.figure(figsize=(11,4))
+	ax = fig.add_axes([0.1, 0.1, 0.8, 0.9])
+	categories = ('Big Drop', 'Small Drop', 'Small Gain', 'Big Gain')
+	ind = np.arange(4)
+	width = 0.1
+
+	 ## Plot three day probabilities
+	for i in range(int(len(three_day_probs) / 4)):
+		pl = ax.bar(ind[i] + 1 * width, three_day_probs[i * 4], width, color='red')
+		pl = ax.bar(ind[i] + 2 * width, three_day_probs[i * 4 + 1], width, color='orange')
+		pl = ax.bar(ind[i] + 3 * width, three_day_probs[i * 4 + 2], width, color='#ebfaeb')
+		pl = ax.bar(ind[i] + 4 * width, three_day_probs[i * 4 + 3], width, color='#6efa70')
+
+	## Plot two day probability 
+	conditioned_pl = ax.bar(ind + (5 * width), two_day_probs, width * 1.5, color='blue')
+	orig_pl = ax.bar(ind + (6.5 * width), category_probabilities, width * 1.5, color='black')
+
+	labels = ['Original',
+              'After a ' + category_full_names[previous_day], 
+              'After a big drop, then a ' + category_full_names[previous_day],
+              'After a small drop, then a ' + category_full_names[previous_day], 
+              'After a small gain, then a ' + category_full_names[previous_day], 
+              'After a big gain, then a ' + category_full_names[previous_day]]
+	original_patch = mpatches.Patch(color='black')
+	two_day_patch = mpatches.Patch(color='blue')
+	bd_x_patch = mpatches.Patch(color='red')
+	sd_x_patch = mpatches.Patch(color='orange')
+	sg_x_patch = mpatches.Patch(color='#ebfaeb')
+	bg_x_patch = mpatches.Patch(color='#6efa70')
+	fig.legend([original_patch, two_day_patch, bd_x_patch, sd_x_patch, sg_x_patch, bg_x_patch], labels, 'upper right')
+
+	plt.ylabel('Probabilities')
+	plt.title('Probabilities of each Category')
+	plt.xticks(ind + 4.5 * width, categories)
 
 #######################
 ## Practice 10
@@ -443,4 +596,23 @@ def run_three_day_momentum_simulation(prior_daily_movements, starting_value, mu,
 		trials.append(simulate_movements(steps, starting_value))
 
 	return trials
+
+
+##-=-=-=-=-=-=-=-=-=-=-=
+## Function Graveyard
+##-=-=-=-=-=-=-=-=-=-=-=
+
+# def get_movements_all_stocks(period_length):
+# 	all_movements = []
+# 	g = glob.glob('stock_data/*.csv')
+# 	for i in range(len(g)):
+# 		df = pd.DataFrame()
+# 		df = df.from_csv(g[i])
+
+# 		movements = get_price_movements(df, period=period_length)
+# 		all_movements.extend(movements)
+
+# 	return all_movements
+
+
 
