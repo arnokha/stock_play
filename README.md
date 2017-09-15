@@ -17,4 +17,3 @@ Eventually my goal is to add other sources of data, both fundamental and technic
 ### Progress
 I have currently have completed up to and including nb 11
 
-test
