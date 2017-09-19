@@ -15,4 +15,4 @@ as well as trying other methodologies.
 Eventually my goal is to add other sources of data, both fundamental and technical in nature, and to build stronger tools.
 
 ### Progress
-I have currently have completed up to and including nb 11
+I have currently have completed up to and including nb 12
