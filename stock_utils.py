@@ -5,10 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import glob
 from scipy import stats
-
+import random
 
 category_full_names = {'vbd':'very big drop', 'bd':'big drop', 'md':'medium drop', 'sd':'small drop',
                        'vbg':'very big gain', 'bg':'big gain', 'mg':'medium gain', 'sg':'small gain'}
+
+index2category = {0:'bd', 1:'sd', 2:'sg', 3:'bg'}
+category2index = {'bd':0, 'sd':1, 'sg':2, 'bg':3}
+movement_category_types = ['bd', 'sd', 'sg', 'bg'] ## 4
 
 def ticker_from_csv(csv_string):
 	""" 
@@ -597,6 +601,474 @@ def run_three_day_momentum_simulation(prior_daily_movements, starting_value, mu,
 
 	return trials
 
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+## Intra-day Range functions (Nb 11)
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+def get_intra_day_range(df):
+	df = df.sort_index(axis=0)
+	intra_day_range = np.zeros(len(df))
+	i = 0
+	for index, row in df.iterrows():
+		intra_day_range[i] = row['high'] - row['low']
+		i += 1
+    
+	return intra_day_range
+
+def get_intra_day_range_percentage(df):
+	df = df.sort_index(axis=0)
+	intra_day_range = np.zeros(len(df))
+	i = 0
+	for index, row in df.iterrows():
+		intra_day_range[i] = 100 * (row['high'] - row['low']) / ((row['high'] + row['low']) / 2)
+		i += 1
+    
+	return intra_day_range
+
+def categorize_ranges(ranges):
+	"""Given an array of ranges, return an array of categories based on how relatively large the ranges are"""
+	mu, sigma = np.mean(ranges), np.std(ranges)
+	categories = []
+    
+	for i in range(len(ranges)):
+		if (ranges[i] <= (mu - sigma)):
+			categories.append('vs')  ## very small
+		elif (ranges[i] < mu):
+			categories.append('s')   ## small drop
+		elif (ranges[i] >= (mu + sigma)):
+			categories.append('vl')  ## very large
+		elif (ranges[i] >= mu):
+			categories.append('l')  ## small gain
+		else:
+			print("didn't fit")
+    
+	return categories
+
+def count_range_category(categories, cat_to_count):
+	count = 0
+	for i in range(len(categories)):
+		if categories[i] == cat_to_count:
+			count = count + 1
+	return count
+
+def count_trends(trends, trend_to_count):
+	count = 0
+	for i in range(len(trends)):
+		if trends[i] == trend_to_count:
+			count = count + 1
+	return count
+
+def get_two_day_range_trends(range_categories, movement_categories):
+	two_day_trends = []
+	for i in range(len(range_categories) - 1):
+		two_day_trends.append(str(range_categories[i]) + '_' + str(movement_categories[i+1]))
+	return two_day_trends
+
+def plot_probability_bar_graph_ranges(name, count, two_day_trends, show_baseline=True, n_cats=4):
+	if (n_cats != 4):
+		raise ValueError('Only four categories are supported at this time')
+		
+	two_day_probs = []
+	range_full_names = {'vs':'very small', 's':'small', 'l':'large', 'vl':'very large'}
+	
+	all_categories = ['bd', 'sd', 'sg', 'bg']
+	for next_day in all_categories:
+		two_day_name = name +'_' + next_day
+		two_day_count = count_trends(two_day_trends, two_day_name)
+		two_day_prob = two_day_count / count
+		two_day_probs.append(two_day_prob)
+
+	plt.figure(figsize=(11,4))
+	movement_category_names = ('Big Drop', 'Small Drop', 'Small Gain', 'Big Gain')
+	range_category_names = ('Very Small', 'Small', 'Large', 'Very Large')
+	ind = np.arange(4)
+	width = 0.25
+	if (show_baseline):
+		orig_pl = plt.bar(ind+width, movement_cat_probs, width, color='b', label='Original')
+	conditioned_pl = plt.bar(ind, two_day_probs, width, color='r', label='After a ' + range_full_names[name] + ' ID range')
+	plt.ylabel('Probabilities')
+	plt.title('Probabilities of each Category')
+	plt.xticks(ind+width, movement_category_names)
+	plt.legend()
+	plt.show()
+
+
+def get_idr_trends_all_stocks(period_length, all_category_names, trend_length=2, n_cats=4):
+	"""
+	Get an aggregate of trends for all stocks, from a specified period_length (1 would be daily, 7 weekly, etc.),
+	a specified trend_length(2 would be looking for two day trends), and a list all_category_names that contains
+	each possible category name.
+	
+	We return: 
+	  all_trends          -- The aggregate list of all trends accross stocks
+	  all_category_counts -- The aggregate count of each category accross stocks
+	  all_category_probs  -- The probability of each category accross stocks
+	"""
+	if (trend_length != 2):
+		raise ValueError('Trend length must be two for now')
+	if (n_cats != 4):
+		raise ValueError('Number of categories musr be four for now')
+    
+	g = glob.glob('stock_data/*.csv')
+	
+	all_range_categories = []
+	all_trends = []
+	
+	all_range_category_counts = np.zeros(len(all_category_names), dtype=np.int)
+	total_count = 0
+	
+	for i in range(len(g)):
+		df = pd.DataFrame()
+		df = df.from_csv(g[i])
+		
+		movements = get_price_movements(df, period=period_length)
+		movement_categories = categorize_movements(movements, n_cats=n_cats)
+		
+		range_categories = categorize_ranges(get_intra_day_range_percentage(df))
+		#
+		#all_movements.extend(movements)
+		all_range_categories.extend(movement_categories)
+		
+		for j in range(len(all_category_names)):
+			#print(all_category_names[j])
+			all_range_category_counts[j] += count_range_category(range_categories, all_category_names[j])
+		#print(all_range_category_counts)
+		trends = get_two_day_range_trends(range_categories, movement_categories)
+		all_trends.extend(trends)
+	
+	all_category_probs = np.zeros(len(all_category_names), dtype=np.float)
+	total_count = len(all_range_categories)
+	for i in range(len(all_category_names)):
+		all_category_probs[i] = (all_range_category_counts[i] / total_count)
+
+	return (all_trends, all_range_category_counts, all_category_probs, all_range_categories)
+
+##-=-=-=-=-=-=-=-=-=-=-=-=-=
+## Volume functions (Nb 12)
+##-=-=-=-=-=-=-=-=-=-=-=-=-=
+def get_volume(df):
+	df = df.sort_index(axis=0) ## We want dates in sequential order
+	return df['volume'].as_matrix()
+
+def get_relative_volume(df, relative_period=50):
+	df = df.sort_index(axis=0) ## We want dates in sequential order
+	absolute_volumes = df['volume'].as_matrix() #.astype(float)
+	relative_volumes = np.zeros(len(absolute_volumes))
+	
+	half = int(relative_period / 2) ## For the middle, branch out this far in either direction
+	
+	for i in range(len(absolute_volumes)):
+		## Middle
+		if i >= relative_period and i < (len(absolute_volumes) - relative_period):
+			#print('middle')
+			count = 0
+			total_volume = 0
+			for j in range(half):
+				total_volume += absolute_volumes[i-j]
+				count += 1
+			for j in range(half):
+				total_volume += absolute_volumes[i+j+1]
+				count += 1
+			avg_volume = total_volume / count
+			relative_volumes[i] = absolute_volumes[i] / avg_volume
+		## Beginning
+		elif i < relative_period:
+			#print('beginning')
+			count = 0
+			total_volume = 0
+			for j in range(relative_period):
+				total_volume += absolute_volumes[i+j]
+				count += 1
+			avg_volume = total_volume / count
+			relative_volumes[i] = absolute_volumes[i] / avg_volume
+		## End
+		elif i >= (len(absolute_volumes) - relative_period):
+			#print('end')
+			count = 0
+			total_volume = 0
+			for j in range(relative_period):
+				total_volume += absolute_volumes[i-j]
+				count += 1
+			avg_volume = total_volume / count
+			relative_volumes[i] = absolute_volumes[i] / avg_volume
+		else:
+			print('something went wrong')
+	#for i in range((len(absolute_volumes)) - (len(absolute_volumes) - relative_period)):
+		#print(i)
+		
+	return relative_volumes
+
+
+def categorize_volumes(ranges):
+	"""Given an array of ranges, return an array of categories based on how relatively large the ranges are"""
+	mu, sigma = np.mean(ranges), np.std(ranges)
+	categories = []
+	
+	for i in range(len(ranges)):
+		if (ranges[i] <= (mu - sigma)):
+			categories.append('vl')  ## very low
+		elif (ranges[i] < mu):
+			categories.append('l')   ## low
+		elif (ranges[i] >= (mu + sigma)):
+			categories.append('h')   ## high
+		elif (ranges[i] >= mu):
+			categories.append('vh')  ## very high
+		else:
+			print("didn't fit")
+	
+	return categories
+
+def count_volume_category(categories, cat_to_count):
+	count = 0
+	for i in range(len(categories)):
+		if categories[i] == cat_to_count:
+			count = count + 1
+	return count
+
+def get_two_day_volume_trends(vol_categories, movement_categories):
+	two_day_trends = []
+	for i in range(len(vol_categories) - 1):
+		two_day_trends.append(vol_categories[i] + '_' + movement_categories[i+1])
+	return two_day_trends
+
+def plot_probability_bar_graph_volumes(name, count, two_day_trends, show_baseline=True, n_cats=4):
+	if (n_cats != 4):
+		raise ValueError('Only four categories are supported at this time')
+		
+	two_day_probs = []
+	volume_full_names = {'vl':'very low', 'l':'low', 'h':'high', 'vh':'very high'}
+	
+	all_categories = ['bd', 'sd', 'sg', 'bg']
+	for next_day in all_categories:
+		two_day_name = name +'_' + next_day
+		two_day_count = count_trends(two_day_trends, two_day_name)
+		two_day_prob = two_day_count / count
+		two_day_probs.append(two_day_prob)
+
+	plt.figure(figsize=(11,4))
+	movement_category_names = ('Big Drop', 'Small Drop', 'Small Gain', 'Big Gain')
+	volume_category_names = ('Very Low', 'Low', 'High', 'Very High')
+	ind = np.arange(4)
+	width = 0.25
+	if (show_baseline):
+		orig_pl = plt.bar(ind+width, movement_cat_probs, width, color='b', label='Original')
+	conditioned_pl = plt.bar(ind, two_day_probs, width, color='r', label='After a ' + volume_full_names[name] + ' volume day')
+	plt.ylabel('Probabilities')
+	plt.title('Probabilities of each Category')
+	plt.xticks(ind+width, movement_category_names)
+	plt.legend()
+	plt.show()
+
+def get_volume_trends_all_stocks(period_length, all_category_names, trend_length=2, n_cats=4):
+	"""
+	Get an aggregate of trends for all stocks, from a specified period_length (1 would be daily, 7 weekly, etc.),
+	a specified trend_length(2 would be looking for two day trends), and a list all_category_names that contains
+	each possible category name.
+	
+	We return: 
+	  all_trends          -- The aggregate list of all trends accross stocks
+	  all_category_counts -- The aggregate count of each category accross stocks
+	  all_category_probs  -- The probability of each category accross stocks
+	"""
+	if (trend_length != 2):
+		raise ValueError('Trend length must be two for now')
+	if (n_cats != 4):
+		raise ValueError('Number of categories musr be four for now')
+    
+	g = glob.glob('stock_data/*.csv')
+	
+	all_volume_categories = []
+	all_trends = []
+	
+	all_volume_category_counts = np.zeros(len(all_category_names), dtype=np.int)
+	total_count = 0
+	
+	for i in range(len(g)):
+		df = pd.DataFrame()
+		df = df.from_csv(g[i])
+		
+		movements = get_price_movements(df, period=period_length)
+		movement_categories = categorize_movements(movements, n_cats=n_cats)
+		
+		volume_categories = categorize_volumes(get_relative_volume(df, relative_period=50))
+		#
+		#all_movements.extend(movements)
+		all_volume_categories.extend(movement_categories)
+		
+		for j in range(len(all_category_names)):
+			#print(all_category_names[j])
+			all_volume_category_counts[j] += count_volume_category(volume_categories, all_category_names[j])
+		#print(all_range_category_counts)
+		trends = get_two_day_volume_trends(volume_categories, movement_categories)
+		all_trends.extend(trends)
+	
+	all_category_probs = np.zeros(len(all_category_names), dtype=np.float)
+	total_count = len(all_volume_categories)
+	for i in range(len(all_category_names)):
+		all_category_probs[i] = (all_volume_category_counts[i] / total_count)
+
+	return (all_trends, all_volume_category_counts, all_category_probs, all_volume_categories)
+
+##-=-=-=-=-=-=-=-=-=-=-=-=-=
+##  (Nb 13)
+##-=-=-=-=-=-=-=-=-=-=-=-=-=
+def get_single_day_probabilities(movement_categories):
+    movement_category_types = ['bd', 'sd', 'sg', 'bg']
+    single_day_counts = []
+    single_day_probabilities = []
+    total = 0
+    
+    for cat in movement_category_types:
+        count = count_movement_category(movement_categories, cat)
+        single_day_counts.append(count)
+        total += count
+    
+    for count in single_day_counts:
+        single_day_probabilities.append(count/total)
+        
+    return single_day_probabilities
+
+def get_probabilities_after_event(previous_event_category, trends, movement_categories):
+    """
+    Given an event that occured the previous day, return the probabilities of the next day's
+    movement categories conditioned on said event.
+    
+    Arguments:
+      previous_event_category -- The category of the event we observed the previous day 
+                                 (or two days in the case of three day momentum)
+      trends -- All two (or three) day trends that were observed for this event type.
+      movement_categories -- all daily movement categories that were observed
+    
+    Returns:
+      next_day_movement_probabilities -- Probabilities of each of the next day's categories
+                                         conditioned on the previous event category
+    """
+    movement_category_types = ['bd', 'sd', 'sg', 'bg']
+    next_day_movement_probabilities = []
+    
+    for next_day in movement_category_types:
+        trend_name = previous_event_category + '_' + next_day
+        trend_count = count_trends(trends, trend_name)
+            
+        trend_total = 0
+        for category in movement_category_types:
+            trend_total += count_trends(trends, previous_event_category + '_' + category)
+            
+        trend_prob = trend_count / trend_total
+        next_day_movement_probabilities.append(trend_prob)
+        
+    return next_day_movement_probabilities
+
+def select_data_sample(data, sample_size):
+    ## We are going to omit the last sample_size elements, 
+    ## so that  if we start the sample towards the end we won't run out of elements
+    sub_sample = data[0:-sample_size]
+    random_index = random.choice(list(enumerate(sub_sample)))[0]
+    return data[random_index:random_index+sample_size]
+
+def get_next_day_probability(probabilities_given_by_model, previous_days):
+    if len(previous_days) == 2:
+        index = category2index[previous_days[0]] * 4 + category2index[previous_days[1]]
+    elif len(previous_days) == 1:
+        index = category2index[previous_days[0]]
+    elif len(previous_days) == 0:
+        return probabilities_given_by_model
+    else:
+        raise ValueError('So far, only one to three day models are supported. Please set previous_days to a list of length 0 to 2')
+    
+    return probabilities_given_by_model[index]
+
+def build_model_probabilities(movement_categories, trends, n_day_model):
+    movement_category_types = ['bd', 'sd', 'sg', 'bg']
+    
+    ## Three day model
+    if n_day_model == 3:
+        three_day_probs = []
+        for cat in movement_category_types:
+            for cat2 in movement_category_types:
+                three_day_probs.append(get_probabilities_after_event(cat + '_' + cat2, trends, movement_categories))
+        return three_day_probs
+    
+    ## Two day model
+    elif n_day_model == 2:
+        two_day_probs = []
+        for cat in movement_category_types:
+            two_day_probs.append(get_probabilities_after_event(cat, trends, movement_categories))
+        return two_day_probs
+    
+    ## One day model
+    elif n_day_model == 1:
+        one_day_probs = get_single_day_probabilities(movement_categories)
+        return one_day_probs
+
+    else:
+        raise ValueError('So far, only one to three day models are supported. Please set n_day_model between 1 and 3')
+        
+    return
+
+def random_sample_tests_m1_m2(movement_categories, m1_probs, m1_n_day_model, m2_probs, m2_n_day_model, sample_size=50, n_tries=10000):
+    m1_wins = 0
+    m2_wins = 0
+    n_draws = 0
+    
+    for a in range(n_tries):
+        sample = select_data_sample(movement_categories, sample_size)
+        sample_data_probabilities = get_single_day_probabilities(sample)
+        
+        m1_round_score = 0
+        m2_round_score = 0
+        
+        ## This is so models have enough data to "look back" and predict the following day
+        n_lookback_days = max(m1_n_day_model, m2_n_day_model) - 1
+        round_length = len(sample) - n_lookback_days 
+        
+        for i in range(round_length):
+            if (n_lookback_days == 1):
+                prev_day = sample[i]
+                next_day = sample[i+1]
+            elif (n_lookback_days == 2):
+                day_before_last = sample[i]
+                prev_day = sample[i+1]
+                next_day = sample[i+2]
+            else:
+                raise ValueError('This function was meant to test one, two, and three day models against each other.')
+                
+            if (m1_n_day_model == 1):
+                m1_next_day_probs = get_next_day_probability(m1_probs, [])
+            elif (m1_n_day_model == 2):
+                m1_next_day_probs = get_next_day_probability(m1_probs, [prev_day])
+            elif (m1_n_day_model == 3):
+                m1_next_day_probs = get_next_day_probability(m1_probs, [day_before_last, prev_day])
+            
+            if (m2_n_day_model == 1):
+                m2_next_day_probs = get_next_day_probability(m2_probs, [])
+            elif (m2_n_day_model == 2):
+                m2_next_day_probs = get_next_day_probability(m2_probs, [prev_day])
+            elif (m2_n_day_model == 3):
+                m2_next_day_probs = get_next_day_probability(m2_probs, [day_before_last, prev_day])
+        
+            ## Weight correct answers on larger movements more heavily
+            ## In the case of a tie, don't award any points
+            # M1 wins
+            if m1_next_day_probs[category2index[next_day]] > m2_next_day_probs[category2index[next_day]]:
+                if(next_day == 'bg' or next_day == 'bd'):
+                    m1_round_score += 2
+                else:
+                    m1_round_score += 1
+            # M2 wins
+            elif m2_next_day_probs[category2index[next_day]] > m1_next_day_probs[category2index[next_day]]:
+                if(next_day == 'bg' or next_day == 'bd'):
+                    m2_round_score += 2
+                else:
+                    m2_round_score += 1
+
+        if m1_round_score > m2_round_score:
+            m1_wins += 1
+        elif m2_round_score > m1_round_score:
+            m2_wins += 1
+        else:
+            n_draws += 1
+    
+    return m1_wins, m2_wins, n_draws
 
 ##-=-=-=-=-=-=-=-=-=-=-=
 ## Function Graveyard
