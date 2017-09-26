@@ -977,21 +977,20 @@ def get_next_day_probability(probabilities_given_by_model, previous_days):
     
     return probabilities_given_by_model[index]
 
-def build_model_probabilities(movement_categories, trends, n_day_model):
-    movement_category_types = ['bd', 'sd', 'sg', 'bg']
+def build_model_probabilities(movement_categories, trends, n_day_model, previous_category_types=['bd', 'sd', 'sg', 'bg']):
     
     ## Three day model
     if n_day_model == 3:
         three_day_probs = []
-        for cat in movement_category_types:
-            for cat2 in movement_category_types:
+        for cat in previous_category_types:
+            for cat2 in previous_category_types:
                 three_day_probs.append(get_probabilities_after_event(cat + '_' + cat2, trends, movement_categories))
         return three_day_probs
     
     ## Two day model
     elif n_day_model == 2:
         two_day_probs = []
-        for cat in movement_category_types:
+        for cat in previous_category_types:
             two_day_probs.append(get_probabilities_after_event(cat, trends, movement_categories))
         return two_day_probs
     
