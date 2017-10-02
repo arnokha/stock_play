@@ -24,6 +24,9 @@ def ticker_from_csv(csv_string):
     return stock_name.upper()
 
 def get_price_movements(df, period=1):
+    raise NameError('Renamed to get_price_movement_percentages')
+
+def get_price_movement_percentages(df, period=1):
     """ Get the movement of a stock that's in a data frame. """
     df = df.sort_index(axis=0) ## We want the dates in ascending order
     movement = np.zeros(int(len(df) / period)) ## int() rounds down
@@ -64,7 +67,7 @@ def plot_gaussian(x, x_min=-10, x_max=10, n=10000, fill=False, label=''):
         plt.fill_between(xs, 0, y)
 
 
-def plot_gaussian_categorical(x, x_min=-10, x_max=10, n=10000, title=''):
+def plot_gaussian_categorical(x, x_min=-10, x_max=10, n=10000, title='', n_cats=8, n_data=-1):
     """
     Expects an np array of movement percentages, 
     plots the gaussian kernel density estimate
@@ -85,27 +88,41 @@ def plot_gaussian_categorical(x, x_min=-10, x_max=10, n=10000, title=''):
     mu, sigma = np.mean(x), np.std(x)
 
     ## Plot with conditionals
-    plt.fill_between(xs, 0, y, where= xs < mu, 
+    if n_cats == 8:
+        plt.fill_between(xs, 0, y, where= xs < 0, 
                      facecolor='#eeeedd', interpolate=True) ## Small Drop
-    plt.fill_between(xs, 0, y, where= xs < (mu - sigma / 2), 
+        plt.fill_between(xs, 0, y, where= xs < (mu - sigma / 2), 
                      facecolor='yellow', interpolate=True) ## Medium Drop
-    plt.fill_between(xs, 0, y, where= xs < (mu - sigma), 
+        plt.fill_between(xs, 0, y, where= xs < (mu - sigma), 
                      facecolor='orange', interpolate=True) ## Big Drop
-    plt.fill_between(xs, 0, y, where= xs < (mu - 2*sigma), 
+        plt.fill_between(xs, 0, y, where= xs < (mu - 2*sigma), 
                      facecolor='red', interpolate=True) ## Very big drop
-
-    plt.fill_between(xs, 0, y, where= xs > mu, 
+        plt.fill_between(xs, 0, y, where= xs > 0, 
                      facecolor='#ebfaeb', interpolate=True) ## Small Gain
-    plt.fill_between(xs, 0, y, where= xs > (mu + sigma/2), 
+        plt.fill_between(xs, 0, y, where= xs > (mu + sigma/2), 
                      facecolor='#b5fbb6', interpolate=True) ## Gain
-    plt.fill_between(xs, 0, y, where= xs > (mu + sigma), 
+        plt.fill_between(xs, 0, y, where= xs > (mu + sigma), 
                      facecolor='#6efa70', interpolate=True) ## Big Gain
-    plt.fill_between(xs, 0, y, where= xs > (mu + 2*sigma), 
+        plt.fill_between(xs, 0, y, where= xs > (mu + 2*sigma), 
                      facecolor='green', interpolate=True) ## Very Big Gain
+    elif n_cats == 4:
+        plt.fill_between(xs, 0, y, where= xs < 0, 
+                     facecolor='#c64b4b', interpolate=True) ## Small Drop
+        plt.fill_between(xs, 0, y, where= xs < (mu - sigma), 
+                     facecolor='red', interpolate=True) ## Big Drop
+        plt.fill_between(xs, 0, y, where= xs > 0, 
+                     facecolor='#58c959', interpolate=True) ## Small Gain
+        plt.fill_between(xs, 0, y, where= xs > (mu + sigma), 
+                     facecolor='green', interpolate=True) ## Big Gain
+    else:
+        raise ValueError('Use n_cats 4 or 8')
 
     ## Label mu and sigma
     plt.text(x_min + 1, max(y) * 0.8, r'$\mu$ = ' + '{0:.2f}'.format(mu))
     plt.text(x_min + 1, max(y) * 0.9, r'$\sigma$ = ' + '{0:.2f}'.format(sigma))
+    if n_data > 0:
+        plt.text(x_min + 1, max(y) * 0.7, 'n = ' + str(n_data))
+
     ## Set title if given
     if (len(title) != 0):
         plt.title(title)
@@ -175,8 +192,7 @@ def get_trends(categories, trend_length):
         trends.append(trend_string)
     return trends
 
-def get_trends_all_stocks(period_length, trend_length, all_category_names, 
-                          n_cats=4):
+def get_trends_all_stocks(period_length, trend_length, all_category_names, n_cats=4):
     """
     Get an aggregate of trends for all stocks, from a specified period_length 
     (1 would be daily, 7 weekly, etc.), a specified trend_length (2 would be looking for two day trends), 
@@ -200,7 +216,7 @@ def get_trends_all_stocks(period_length, trend_length, all_category_names,
         df = pd.DataFrame()
         df = df.from_csv(g[i])
         
-        movements = get_price_movements(df, period=period_length)
+        movements = get_price_movement_percentages(df, period=period_length)
         movement_categories = categorize_movements(movements, n_cats=n_cats)
         
         all_movements.extend(movements)
@@ -737,7 +753,7 @@ def get_idr_trends_all_stocks(period_length, all_category_names, trend_length=2,
         df = pd.DataFrame()
         df = df.from_csv(g[i])
         
-        movements = get_price_movements(df, period=period_length)
+        movements = get_price_movement_percentages(df, period=period_length)
         movement_categories = categorize_movements(movements, n_cats=n_cats)
         
         range_categories = categorize_ranges(get_intra_day_range_percentage(df))
@@ -909,7 +925,7 @@ def get_volume_trends_all_stocks(period_length, all_category_names,
         df = pd.DataFrame()
         df = df.from_csv(g[i])
         
-        movements = get_price_movements(df, period=period_length)
+        movements = get_price_movement_percentages(df, period=period_length)
         movement_categories = categorize_movements(movements, n_cats=n_cats)
         volume_categories = categorize_volumes(get_relative_volume(df, relative_period=relative_period))
         all_volume_categories.extend(movement_categories)
@@ -964,14 +980,16 @@ def get_probabilities_after_event(previous_event_category, trends, movement_cate
     """
     movement_category_types = ['bd', 'sd', 'sg', 'bg']
     next_day_movement_probabilities = []
+
+    trend_total = 0
+    for category in movement_category_types:
+        trend_total += count_trends(trends, previous_event_category + '_' + category)
     
     for next_day in movement_category_types:
         trend_name = previous_event_category + '_' + next_day
+        #print(trend_name)
         trend_count = count_trends(trends, trend_name)
-            
-        trend_total = 0
-        for category in movement_category_types:
-            trend_total += count_trends(trends, previous_event_category + '_' + category)
+        #print(trend_count)
             
         trend_prob = trend_count / trend_total
         next_day_movement_probabilities.append(trend_prob)
@@ -1007,8 +1025,9 @@ def build_model_probabilities(movement_categories, trends, n_day_model,
         three_day_probs = []
         for cat in previous_category_types:
             for cat2 in previous_category_types:
-                three_day_probs.append(get_probabilities_after_event(cat + '_' + cat2, 
-                                                                     trends, movement_categories))
+                two_day_name = cat + '_' + cat2
+                three_day_probs.append(get_probabilities_after_event(two_day_name, trends, 
+                                                                     movement_categories))
         return three_day_probs
     
     ## Two day model
@@ -1102,6 +1121,110 @@ def random_sample_tests_m1_m2(movement_categories, m1_probs, m1_n_day_model, m2_
     
     return m1_wins, m2_wins, n_draws
 
+
+##
+## Validation testing
+##
+def get_train_valid_trends_all_stocks(period_length, trend_length, all_category_names, 
+                                      training_split_percentage=0.80, n_cats=4):
+    """
+    Get an aggregate of trends for all stocks, from a specified period_length 
+    (1 would be daily, 7 weekly, etc.), a specified trend_length (2 would be looking for two day trends), 
+    and a list all_category_names that contains each possible category name.
+    
+    We return: 
+      all_trends          -- The aggregate list of all trends accross stocks
+      all_category_counts -- The aggregate count of each category accross stocks
+      all_category_probs  -- The probability of each category accross stocks
+    """
+    g = glob.glob('stock_data/*.csv')
+    
+    train_all_movement_categories = []
+    train_all_trends = []
+    valid_all_movement_categories = []
+    valid_all_trends = []
+    
+    train_all_category_counts = np.zeros(len(all_category_names), dtype=np.int)
+    valid_all_category_counts = np.zeros(len(all_category_names), dtype=np.int)
+    #train_total_count = 0
+    #valid_total_count = 0
+
+    #train_split = int(training_split_percentage / 100) * len(movements)
+    #valid_split = int((100 - training_split_percentage) / 10)
+    #print(range(len(g)))
+
+    for i in range(len(g)):
+        df = pd.DataFrame()
+        df = df.from_csv(g[i])
+        
+        movements = get_price_movement_percentages(df, period=period_length)
+        #movement_categories = categorize_movements(movements, n_cats=n_cats)
+        train_split = int(training_split_percentage * len(movements))
+        train_movement_categories = categorize_movements(movements[0:train_split])
+        valid_movement_categories = categorize_movements(movements[train_split+1:len(movements)])
+        
+        train_all_movement_categories.extend(train_movement_categories)
+        valid_all_movement_categories.extend(valid_movement_categories)
+        
+        for j in range(len(all_category_names)):
+            train_all_category_counts[j] += \
+              count_movement_category(train_movement_categories, all_category_names[j])
+            valid_all_category_counts[j] += \
+              count_movement_category(valid_movement_categories, all_category_names[j])
+
+        train_trends = get_trends(train_movement_categories, trend_length)
+        valid_trends = get_trends(valid_movement_categories, trend_length)
+        train_all_trends.extend(train_trends)
+        valid_all_trends.extend(valid_trends)
+    
+    train_all_category_probs = np.zeros(len(all_category_names), dtype=np.float)
+    valid_all_category_probs = np.zeros(len(all_category_names), dtype=np.float)
+    train_total_count = len(train_all_movement_categories)
+    valid_total_count = len(valid_all_movement_categories)
+    for i in range(len(all_category_names)):
+        train_all_category_probs[i] = (train_all_category_counts[i] / train_total_count)
+        valid_all_category_probs[i] = (valid_all_category_counts[i] / valid_total_count)
+
+    return (train_all_trends, train_all_category_counts, 
+            train_all_category_probs, train_all_movement_categories,
+            valid_all_trends, valid_all_category_counts, 
+            valid_all_category_probs, valid_all_movement_categories)
+
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=##
+## Nbs 05x2 and 08x2: Linear predictions rather than categorical
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=##
+def get_trends_linear(movement_categories, movement_percentages, trend_length):
+    """
+    Given a list of movement categories, a list of movement percentages, and
+    the length of the trend we are looking for, return a list of trend_length-1
+    tuples containing trend categories and then the following days movement percentage.
+
+    e.g. We have categories = ['a', 'b', 'a', 'c', 'a'], and associated movement percentages 
+         [-1, 1, -2, 5, -1]. If the trend_length we are looking at is 2, we would get
+         [('a',1), ('b',-2), ('a',5), ('c',-1)] 
+
+         If instead, trend_length was 3, we would have [('a_b', -2), ('b_a', 5), ('a_c', -1)].
+    """
+    trends = []
+    for i in range(len(movement_categories) - trend_length + 1):
+        trend_string = movement_categories[i]
+        counter = 1
+        for _ in range(trend_length - 2):
+            trend_string += '_' + movement_categories[i+counter]
+            counter += 1
+        trend_and_movement = (trend_string, movement_percentages[i+counter])
+        trends.append(trend_and_movement)
+    return trends
+
+def get_movements_after_trend(trend, trends_and_movements):
+    """Get all stock movement percentages after the given trend is observed"""
+    movements_after_trend = []
+    for i in range(len(trends_and_movements)):
+        if trend == trends_and_movements[i][0]:
+            movements_after_trend.append(trends_and_movements[i][1])
+            
+    return movements_after_trend
+
 ##-=-=-=-=-=-=-=-=-=-=-=
 ## Function Graveyard
 ##-=-=-=-=-=-=-=-=-=-=-=
@@ -1113,7 +1236,7 @@ def random_sample_tests_m1_m2(movement_categories, m1_probs, m1_n_day_model, m2_
 #         df = pd.DataFrame()
 #         df = df.from_csv(g[i])
 
-#         movements = get_price_movements(df, period=period_length)
+#         movements = get_price_movement_percentages(df, period=period_length)
 #         all_movements.extend(movements)
 
 #     return all_movements
