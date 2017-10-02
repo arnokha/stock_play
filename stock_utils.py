@@ -140,17 +140,17 @@ def categorize_movements(movements, n_cats=4):
             if (movements[i] <= (mu - 2*sigma)): categories.append('vbd')   ## very big drop
             elif (movements[i] <= (mu - sigma)): categories.append('bd')    ## big drop
             elif (movements[i] <= (mu - sigma/2)): categories.append('md')  ## medium drop
-            elif (movements[i] < mu): categories.append('sd')               ## small drop
+            elif (movements[i] < 0): categories.append('sd')                ## small drop
             elif (movements[i] >= (mu + 2*sigma)): categories.append('vbg') ## very big gain
             elif (movements[i] >= (mu + sigma)): categories.append('bg')    ## big gain
             elif (movements[i] >= (mu + sigma/2)): categories.append('mg')  ## medium gain
-            elif (movements[i] >= mu): categories.append('sg')              ## small gain
+            elif (movements[i] >= 0): categories.append('sg')               ## small gain
     elif (n_cats == 4):
         for i in range(len(movements)):
             if (movements[i] <= (mu - sigma)): categories.append('bd')   ## big drop
-            elif (movements[i] < mu): categories.append('sd')            ## small drop
+            elif (movements[i] < 0): categories.append('sd')             ## small drop
             elif (movements[i] >= (mu + sigma)): categories.append('bg') ## big gain
-            elif (movements[i] >= mu): categories.append('sg')           ## small gain
+            elif (movements[i] >= 0): categories.append('sg')            ## small gain
     else:
         raise ValueError('Currently only 4 and 8 categories are supported')
 
