@@ -3,3 +3,4 @@ Single_Variable_Linear_regression.ipynb
 .ipynb_checkpoints/*
 stock_data/*
 new_stock_data/*
+__pycache__/*
