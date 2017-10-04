@@ -996,13 +996,16 @@ def get_probabilities_after_event(previous_event_category, trends, movement_cate
         
     return next_day_movement_probabilities
 
-def select_data_sample(data, sample_size):
+def select_data_sample(data, sample_size, data2=None):
     ## We are going to omit the last sample_size elements, 
     ## so that  if we start the sample towards the end we won't run out of 
     ## elements
     sub_sample = data[0:-sample_size]
     random_index = random.choice(list(enumerate(sub_sample)))[0]
-    return data[random_index:random_index+sample_size]
+    if data2 is None:
+        return data[random_index:random_index+sample_size]
+    else:
+        return data[random_index:random_index+sample_size], data2[random_index:random_index+sample_size]
 
 def get_next_day_probability(probabilities_given_by_model, previous_days):
     if len(previous_days) == 2:
@@ -1225,21 +1228,349 @@ def get_movements_after_trend(trend, trends_and_movements):
             
     return movements_after_trend
 
-##-=-=-=-=-=-=-=-=-=-=-=
-## Function Graveyard
-##-=-=-=-=-=-=-=-=-=-=-=
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=##
+## Nbs 16: Model classes. TODO Clean them up
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=##
+def p_array_to_dict(p, trend_length):
+    p_dict = {}
+    if (trend_length == 1):
+        p_dict['bd'] = p[0]
+        p_dict['sd'] = p[1]
+        p_dict['sg'] = p[2]
+        p_dict['bg'] = p[3]
 
-# def get_movements_all_stocks(period_length):
-#     all_movements = []
-#     g = glob.glob('stock_data/*.csv')
-#     for i in range(len(g)):
-#         df = pd.DataFrame()
-#         df = df.from_csv(g[i])
+    elif (trend_length == 2):
+        p_dict['bd_bd'] = p[0][0]
+        p_dict['bd_sd'] = p[0][1]
+        p_dict['bd_sg'] = p[0][2]
+        p_dict['bd_bg'] = p[0][3]
+        p_dict['sd_bd'] = p[1][0]
+        p_dict['sd_sd'] = p[1][1]
+        p_dict['sd_sg'] = p[1][2]
+        p_dict['sd_bg'] = p[1][3]
+        p_dict['sg_bd'] = p[2][0]
+        p_dict['sg_sd'] = p[2][1]
+        p_dict['sg_sg'] = p[2][2]
+        p_dict['sg_bg'] = p[2][3]
+        p_dict['bg_bd'] = p[3][0]
+        p_dict['bg_sd'] = p[3][1]
+        p_dict['bg_sg'] = p[3][2]
+        p_dict['bg_bg'] = p[3][3]
 
-#         movements = get_price_movement_percentages(df, period=period_length)
-#         all_movements.extend(movements)
+    elif (trend_length == 3):
+        p_dict['bd_bd_bd'] = p[0][0]
+        p_dict['bd_bd_sd'] = p[0][1]
+        p_dict['bd_bd_sg'] = p[0][2]
+        p_dict['bd_bd_bg'] = p[0][3]
+        p_dict['bd_sd_bd'] = p[1][0]
+        p_dict['bd_sd_sd'] = p[1][1]
+        p_dict['bd_sd_sg'] = p[1][2]
+        p_dict['bd_sd_bg'] = p[1][3]
+        p_dict['bd_sg_bd'] = p[2][0]
+        p_dict['bd_sg_sd'] = p[2][1]
+        p_dict['bd_sg_sg'] = p[2][2]
+        p_dict['bd_sg_bg'] = p[2][3]
+        p_dict['bd_bg_bd'] = p[3][0]
+        p_dict['bd_bg_sd'] = p[3][1]
+        p_dict['bd_bg_sg'] = p[3][2]
+        p_dict['bd_bg_bg'] = p[3][3]
+        
+        p_dict['sd_bd_bd'] = p[4][0]
+        p_dict['sd_bd_sd'] = p[4][1]
+        p_dict['sd_bd_sg'] = p[4][2]
+        p_dict['sd_bd_bg'] = p[4][3]
+        p_dict['sd_sd_bd'] = p[5][0]
+        p_dict['sd_sd_sd'] = p[5][1]
+        p_dict['sd_sd_sg'] = p[5][2]
+        p_dict['sd_sd_bg'] = p[5][3]
+        p_dict['sd_sg_bd'] = p[6][0]
+        p_dict['sd_sg_sd'] = p[6][1]
+        p_dict['sd_sg_sg'] = p[6][2]
+        p_dict['sd_sg_bg'] = p[6][3]
+        p_dict['sd_bg_bd'] = p[7][0]
+        p_dict['sd_bg_sd'] = p[7][1]
+        p_dict['sd_bg_sg'] = p[7][2]
+        p_dict['sd_bg_bg'] = p[7][3]
+        
+        p_dict['sg_bd_bd'] = p[8][0]
+        p_dict['sg_bd_sd'] = p[8][1]
+        p_dict['sg_bd_sg'] = p[8][2]
+        p_dict['sg_bd_bg'] = p[8][3]
+        p_dict['sg_sd_bd'] = p[9][0]
+        p_dict['sg_sd_sd'] = p[9][1]
+        p_dict['sg_sd_sg'] = p[9][2]
+        p_dict['sg_sd_bg'] = p[9][3]
+        p_dict['sg_sg_bd'] = p[10][0]
+        p_dict['sg_sg_sd'] = p[10][1]
+        p_dict['sg_sg_sg'] = p[10][2]
+        p_dict['sg_sg_bg'] = p[10][3]
+        p_dict['sg_bg_bd'] = p[11][0]
+        p_dict['sg_bg_sd'] = p[11][1]
+        p_dict['sg_bg_sg'] = p[11][2]
+        p_dict['sg_bg_bg'] = p[11][3]
+        
+        p_dict['bg_bd_bd'] = p[12][0]
+        p_dict['bg_bd_sd'] = p[12][1]
+        p_dict['bg_bd_sg'] = p[12][2]
+        p_dict['bg_bd_bg'] = p[12][3]
+        p_dict['bg_sd_bd'] = p[13][0]
+        p_dict['bg_sd_sd'] = p[13][1]
+        p_dict['bg_sd_sg'] = p[13][2]
+        p_dict['bg_sd_bg'] = p[13][3]
+        p_dict['bg_sg_bd'] = p[14][0]
+        p_dict['bg_sg_sd'] = p[14][1]
+        p_dict['bg_sg_sg'] = p[14][2]
+        p_dict['bg_sg_bg'] = p[14][3]
+        p_dict['bg_bg_bd'] = p[15][0]
+        p_dict['bg_bg_sd'] = p[15][1]
+        p_dict['bg_bg_sg'] = p[15][2]
+        p_dict['bg_bg_bg'] = p[15][3]
 
-#     return all_movements
+    else:
+        raise ValueError('Only trend lengths of 1-3 are supported right now')
+
+    return p_dict
+
+class OneDayModel:
+    trained=False
+    verbose=False
+    probabilities = {}
+    
+    def __init__(self, data=None):
+        if self.verbose: print('Initializing Model...')
+        if data is not None:
+            self.train(data)
+        else:
+            print('Inintializing without training data')
+        
+    def __str__(self):
+        return 'One Day Model'
+
+    def train(self, movement_categories):
+        if self.verbose: print('Training...')
+        p = get_single_day_probabilities(movement_categories)
+        self.probabilities = p_array_to_dict(p, 1)
+        self.trained=True
+        
+    def predict(self, input_sequence):
+        predictions = []
+        p_labels = []
+        p_vals = []
+        
+        for p_label, p_val in self.probabilities.items():
+            p_labels.append(p_label)
+            p_vals.append(p_val)
+        for i in range(len(input_sequence)):
+            predictions.append(choose_category(p_labels,p_vals))
+        return predictions
+
+class TwoDayModel:
+    trained=False
+    verbose=False
+    probabilities = {}
+    input_to_possibile_outs = {'bd': ['bd_bd', 'bd_sd', 'bd_sg', 'bd_bg'],
+                               'sd': ['sd_bd', 'sd_sd', 'sd_sg', 'sd_bg'],
+                               'sg': ['sg_bd', 'sg_sd', 'sg_sg', 'sg_bg'],
+                               'bg': ['bg_bd', 'bg_sd', 'bg_sg', 'bg_bg']}
+
+    def __init__(self, data=None):
+        if self.verbose: print('Initializing Model...')
+        if data is not None:
+            self.train(data)
+        else:
+            print('Inintializing without training data')
+            
+    def __str__(self):
+        return 'Local Two Day Model'
+
+    def train(self, movement_categories):
+        if self.verbose: print('Training...')
+        two_day_trends = get_trends(movement_categories, 2)
+        p = build_model_probabilities(movement_categories, two_day_trends, 2)
+        self.probabilities = p_array_to_dict(p, 2)
+        self.trained=True
+        
+    def predict(self, input_sequence, raw=False):
+        predictions = []
+        p_labels = []
+        p_vals = []
+            
+        for i in range(len(input_sequence)):
+            #print(input_sequence[i])
+            p_labels = self.input_to_possibile_outs[input_sequence[i]]
+            #print(p_labels)
+            for i in range(len(p_labels)):
+                p_vals.append(self.probabilities[p_labels[i]])
+            raw_choice = choose_category(p_labels, p_vals) ## input_output
+            choice = raw_choice.rsplit('_', 1)[1] ## output
+            if raw:
+                predictions.append(raw_choice)
+            else:
+                predictions.append(choice)
+        return predictions
+
+class TwoDayCompositeModel:
+    trained=False
+    verbose=False
+    probabilities = {}
+    input_to_possibile_outs = {'bd': ['bd_bd', 'bd_sd', 'bd_sg', 'bd_bg'],
+                               'sd': ['sd_bd', 'sd_sd', 'sd_sg', 'sd_bg'],
+                               'sg': ['sg_bd', 'sg_sd', 'sg_sg', 'sg_bg'],
+                               'bg': ['bg_bd', 'bg_sd', 'bg_sg', 'bg_bg']}
+
+    def __init__(self):
+        self.train()
+
+    def __str__(self):
+        return 'Composite Two Day Model'
+            
+    def train(self):
+        (train_all_two_day_trends, _, _, train_all_movement_categories, _, _, _, _) = \
+                get_train_valid_trends_all_stocks(1, 2, movement_category_types, n_cats=4)
+        
+        train_composite_two_day_probs = build_model_probabilities(train_all_movement_categories, 
+                                                                  train_all_two_day_trends, 2)
+        p = train_composite_two_day_probs
+        self.probabilities = p_array_to_dict(p, 2)
+        self.trained=True
+
+    def predict(self, input_sequence, raw=False):
+        predictions = []
+        p_labels = []
+        p_vals = []
+            
+        for i in range(len(input_sequence)):
+            #print(input_sequence[i])
+            p_labels = self.input_to_possibile_outs[input_sequence[i]]
+            #print(p_labels)
+            for j in range(len(p_labels)):
+                p_vals.append(self.probabilities[p_labels[j]])
+            raw_choice = choose_category(p_labels, p_vals) ## input_output
+            choice = raw_choice.rsplit('_', 1)[1] ## output
+            if raw:
+                predictions.append(raw_choice)
+            else:
+                predictions.append(choice)
+        return predictions
+
+class TwoDayVolumeModel:
+    trained=False
+    verbose=False
+    probabilities = {}
+    input_to_possibile_outs = {'vl': ['vl_bd', 'vl_sd', 'vl_sg', 'vl_bg'],
+                               'l':  ['l_bd', 'l_sd', 'l_sg', 'l_bg'],
+                               'h':  ['h_bd', 'h_sd', 'h_sg', 'h_bg'],
+                               'vh': ['vh_bd', 'vh_sd', 'vh_sg', 'vh_bg']}
+
+    def __init__(self, movement_categories=None, volume_categories=None):
+        if self.verbose: print('Initializing Model...')
+        if movement_categories is not None and volume_categories is not None:
+            self.train(movement_categories, volume_categories)
+        else:
+            print('Inintializing without training data')
+       
+    def __str__(self):
+        return 'Two Day Volume Model'
+
+    def train(self, movement_categories, volume_categories):
+        if self.verbose: print('Training...')
+        two_day_volume_trends = get_two_day_volume_trends(volume_categories, movement_categories)
+        #print(two_day_volume_trends[0:30])
+        p = build_model_probabilities(movement_categories, two_day_volume_trends, 
+                                      2, previous_category_types=['vl', 'l', 'h', 'vh'])
+        self.probabilities['vl_bd'] = p[0][0]
+        self.probabilities['vl_sd'] = p[0][1]
+        self.probabilities['vl_sg'] = p[0][2]
+        self.probabilities['vl_bg'] = p[0][3]
+        self.probabilities['l_bd'] = p[1][0]
+        self.probabilities['l_sd'] = p[1][1]
+        self.probabilities['l_sg'] = p[1][2]
+        self.probabilities['l_bg'] = p[1][3]
+        self.probabilities['h_bd'] = p[2][0]
+        self.probabilities['h_sd'] = p[2][1]
+        self.probabilities['h_sg'] = p[2][2]
+        self.probabilities['h_bg'] = p[2][3]
+        self.probabilities['vh_bd'] = p[3][0]
+        self.probabilities['vh_sd'] = p[3][1]
+        self.probabilities['vh_sg'] = p[3][2]
+        self.probabilities['vh_bg'] = p[3][3]
+        self.trained=True
+        
+    def predict(self, input_sequence, raw=False):
+        predictions = []
+        p_labels = []
+        p_vals = []
+            
+        for i in range(len(input_sequence)):
+            p_labels = self.input_to_possibile_outs[input_sequence[i]]
+            for j in range(len(p_labels)):
+                p_vals.append(self.probabilities[p_labels[j]])
+            raw_choice = choose_category(p_labels, p_vals) ## input_output
+            choice = raw_choice.rsplit('_', 1)[1] ## output
+            if raw:
+                predictions.append(raw_choice)
+            else:
+                predictions.append(choice)
+        return predictions
+
+class ThreeDayModel:
+    trained=False
+    verbose=False
+    probabilities = {}
+    input_to_possibile_outs = {'bd_bd': ['bd_bd_bd', 'bd_bd_sd', 'bd_bd_sg', 'bd_bd_bg'],
+                               'bd_sd': ['bd_sd_bd', 'bd_sd_sd', 'bd_sd_sg', 'bd_sd_bg'],
+                               'bd_sg': ['bd_sg_bd', 'bd_sg_sd', 'bd_sg_sg', 'bd_sg_bg'],
+                               'bd_bg': ['bd_bg_bd', 'bd_bg_sd', 'bd_bg_sg', 'bd_bg_bg'],
+                               
+                               'sd_bd': ['sd_bd_bd', 'sd_bd_sd', 'sd_bd_sg', 'sd_bd_bg'],
+                               'sd_sd': ['sd_sd_bd', 'sd_sd_sd', 'sd_sd_sg', 'sd_sd_bg'],
+                               'sd_sg': ['sd_sg_bd', 'sd_sg_sd', 'sd_sg_sg', 'sd_sg_bg'],
+                               'sd_bg': ['sd_bg_bd', 'sd_bg_sd', 'sd_bg_sg', 'sd_bg_bg'],
+                               
+                               'sg_bd': ['sg_bd_bd', 'sg_bd_sd', 'sg_bd_sg', 'sg_bd_bg'],
+                               'sg_sd': ['sg_sd_bd', 'sg_sd_sd', 'sg_sd_sg', 'sg_sd_bg'],
+                               'sg_sg': ['sg_sg_bd', 'sg_sg_sd', 'sg_sg_sg', 'sg_sg_bg'],
+                               'sg_bg': ['sg_bg_bd', 'sg_bg_sd', 'sg_bg_sg', 'sg_bg_bg'],
+                               
+                               'bg_bd': ['bg_bd_bd', 'bg_bd_sd', 'bg_bd_sg', 'bg_bd_bg'],
+                               'bg_sd': ['bg_sd_bd', 'bg_sd_sd', 'bg_sd_sg', 'bg_sd_bg'],
+                               'bg_sg': ['bg_sg_bd', 'bg_sg_sd', 'bg_sg_sg', 'bg_sg_bg'],
+                               'bg_bg': ['bg_bg_bd', 'bg_bg_sd', 'bg_bg_sg', 'bg_bg_bg']}
+    
+    def __init__(self, data=None):
+        if self.verbose: print('Initializing Model...')
+        if data is not None:
+            self.train(data)
+        else:
+            print('Inintializing without training data')
+            
+    def __str__(self):
+        return 'Three Day Model'
+
+    def train(self, movement_categories):
+        if self.verbose: print('Training...')
+        three_day_trends = get_trends(movement_categories, 3)
+        p = build_model_probabilities(movement_categories, three_day_trends, 3)
+        self.probabilities = p_array_to_dict(p, 3)
+        self.trained=True
+        
+    def predict(self, input_sequence, raw=False):
+        predictions = []
+        p_labels = []
+        p_vals = []
+            
+        for i in range(len(input_sequence) - 1):
+            p_labels = self.input_to_possibile_outs[input_sequence[i] + '_' + input_sequence[i+1]]
+            for j in range(len(p_labels)):
+                p_val = self.probabilities[p_labels[j]]
+                p_vals.append(p_val)
+            raw_choice = choose_category(p_labels, p_vals) ## input_output
+            choice = raw_choice.rsplit('_')[2] ## output
+            if raw:
+                predictions.append(raw_choice)
+            else:
+                predictions.append(choice)
+        return predictions
 
 
 
