@@ -1573,4 +1573,129 @@ class ThreeDayModel:
         return predictions
 
 
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=##
+## Nb 18: MACD and Moving average stuff
+##-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=##
+def get_close_price(df):
+    """ Get the simple moving average of a stock that's in a data frame. """
+    df = df.sort_index(axis=0) ## We want the dates in ascending order
+    close = np.zeros(len(df))
+
+    for i in range(len(df)):
+        close[i] = df['close'][i]
+
+    return close
+
+def get_sma(df, period_length):
+    """ Get the simple moving average of a stock that's in a data frame. """
+    #df = df.sort_index(axis=0) ## We want the dates in ascending order
+    sma = np.zeros(len(df))
+    sum_period = np.zeros(len(df))
+    count = 0
+
+    for i in range(len(df)):
+        count = 0
+        for j in range(period_length):
+            if (i - j) >= 0:
+                sum_period[i] += df[i - j]
+                count += 1
+        sma[i] = sum_period[i] / count
+    return sma
+
+def get_ema(df, period_length, alpha):
+    """ Get the explonential moving average of a stock that's in a data frame. """
+    #df = df.sort_index(axis=0) ## We want the dates in ascending order
+    ema = np.zeros(len(df))
+    sum_period = np.zeros(len(df))
+    count = 0
+    if not (0 <= alpha <= 1):
+        raise ValueError('Alpha should be between 0 and 1')
+
+    for i in range(len(df)):
+        count = 0
+        this_alpha = alpha
+        for j in range(period_length):
+            if (i - j) >= 0:
+                sum_period[i] += df[i - j] * this_alpha
+                count += this_alpha
+                #print(this_alpha / alpha)
+                this_alpha *= alpha
+        ema[i] = sum_period[i] / count
+    return ema
+
+def plot_macd(fast_period, slow_period, macd_ema_period, viewing_window, 
+              alpha=0.95, show_ema=False, show_early_signals=False, show_macd_chart=True, 
+              figsize=(16,6), ticker=None, threshold=0):    
+    if ticker is None:
+        close = get_close_price(df)
+    else:
+        df = pd.DataFrame()
+        df = df.from_csv('stock_data/' + ticker.lower() +'.csv')
+        df = df.sort_index(axis=0)
+        close = get_close_price(df)
+    fast_leg = get_ema(close, fast_period, alpha)
+    slow_leg = get_ema(close, slow_period, alpha)
+    macd = fast_leg - slow_leg
+    macd_signal = get_ema(macd, macd_ema_period, alpha)
+    macd_diff = macd - macd_signal
+    
+    zero_line = np.zeros(len(macd))
+    
+    buy_signals = []
+    sell_signals = []
+    early_buy_signals = []
+    early_sell_signals = []
+
+    for i in range(len(macd_diff) - 1):
+        if macd_diff[i] < threshold and macd_diff[i+1] > threshold:
+            buy_signals.append((i, close[i]))
+        elif macd_diff[i] > -threshold and macd_diff[i+1] < -threshold:
+            sell_signals.append((i, close[i]))
+            
+    for i in range(len(macd_diff) - 1):
+        if macd_diff[i] < 0 and  macd_diff[i] < macd_diff[i+1]:
+            early_buy_signals.append((i, close[i]))
+        elif macd_diff[i] > 0 and macd_diff[i] > macd_diff[i+1]:
+            early_sell_signals.append((i, close[i]))
+    
+    plt.figure(figsize=figsize)
+    plt.plot(close[-viewing_window:], label='Stock Price')
+    if show_ema:
+        plt.plot(fast_leg[-viewing_window:], label='Fast EMA')
+        plt.plot(slow_leg[-viewing_window:], label='Slow EMA')
+        
+    plt.title('Stock Price and Signals')
+    
+    if show_early_signals:
+        for i in range(len(early_buy_signals)):
+            if early_buy_signals[i][0] > len(macd) - viewing_window:
+                plt.scatter(early_buy_signals[i][0] - (len(macd) - viewing_window), 
+                            early_buy_signals[i][1], c='#8fba80')
+        for i in range(len(early_sell_signals)):
+            if early_sell_signals[i][0] > len(macd) - viewing_window:
+                plt.scatter(early_sell_signals[i][0] - (len(macd) - viewing_window), 
+                early_sell_signals[i][1], c='#c19b95')##c1897f
+    
+    for i in range(len(buy_signals)):
+        if buy_signals[i][0] > len(macd) - viewing_window:
+            plt.scatter(buy_signals[i][0] - (len(macd) - viewing_window), buy_signals[i][1], c='green')
+    for i in range(len(sell_signals)):
+        if sell_signals[i][0] > len(macd) - viewing_window:
+            plt.scatter(sell_signals[i][0] - (len(macd) - viewing_window), sell_signals[i][1], c='red')
+        
+    plt.legend()
+    
+    ## MACD
+    if show_macd_chart:
+        plt.figure(figsize=figsize)
+        plt.plot(zero_line[-viewing_window:], c='black')
+        plt.plot(macd[-viewing_window:], label='MACD', c='blue')
+        plt.plot(macd_signal[-viewing_window:], label='MACD Signal Line', c='green')
+        plt.plot(macd_diff[-viewing_window:], label='MACD Difference', c='red', linestyle='dashed')
+        plt.title('MACD')
+        plt.legend()
+    plt.show()
+
+
+
 
