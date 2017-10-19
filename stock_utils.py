@@ -1623,6 +1623,9 @@ def get_ema(df, period_length, alpha):
         ema[i] = sum_period[i] / count
     return ema
 
+    ##-----------------------------------------------------------------------------------##
+    ## TODO: Docstring and fix the terrible coding for early buy, buy, sell, early sell  ##
+    ## ----------------------------------------------------------------------------------##
 def plot_macd(fast_period, slow_period, macd_ema_period, viewing_window, 
               alpha=0.95, show_ema=False, show_early_signals=False, show_macd_chart=True, 
               figsize=(16,6), ticker=None, threshold=0):    
@@ -1667,21 +1670,48 @@ def plot_macd(fast_period, slow_period, macd_ema_period, viewing_window,
     plt.title('Stock Price and Signals')
     
     if show_early_signals:
+        plotted_buy_label = False
+        plotted_sell_label = False
         for i in range(len(early_buy_signals)):
             if early_buy_signals[i][0] > len(macd) - viewing_window:
-                plt.scatter(early_buy_signals[i][0] - (len(macd) - viewing_window), 
-                            early_buy_signals[i][1], c='#8fba80')
+                if not plotted_buy_label:
+                    plt.scatter(early_buy_signals[i][0] - (len(macd) - viewing_window), 
+                                early_buy_signals[i][1], c='#8fba80', label='Early Buy Signal')
+                    plotted_buy_label = True
+                else:
+                    plt.scatter(early_buy_signals[i][0] - (len(macd) - viewing_window), 
+                                early_buy_signals[i][1], c='#8fba80')
         for i in range(len(early_sell_signals)):
             if early_sell_signals[i][0] > len(macd) - viewing_window:
-                plt.scatter(early_sell_signals[i][0] - (len(macd) - viewing_window), 
-                early_sell_signals[i][1], c='#c19b95')##c1897f
+                if not plotted_sell_label:
+                    plt.scatter(early_sell_signals[i][0] - (len(macd) - viewing_window), 
+                                early_sell_signals[i][1], c='#c19b95', label='Early Sell Signal')
+                    plotted_sell_label = True
+                else:
+                    plt.scatter(early_sell_signals[i][0] - (len(macd) - viewing_window), 
+                                early_sell_signals[i][1], c='#c19b95')##c1897f
     
+    plotted_buy_label = False
     for i in range(len(buy_signals)):
         if buy_signals[i][0] > len(macd) - viewing_window:
-            plt.scatter(buy_signals[i][0] - (len(macd) - viewing_window), buy_signals[i][1], c='green')
+            if not plotted_buy_label:
+                plt.scatter(buy_signals[i][0] - (len(macd) - viewing_window), buy_signals[i][1], 
+                            c='green', label='Buy Signal')
+                plotted_buy_label = True
+            else:
+                plt.scatter(buy_signals[i][0] - (len(macd) - viewing_window), buy_signals[i][1], 
+                            c='green')
+
+    plotted_sell_label = False
     for i in range(len(sell_signals)):
         if sell_signals[i][0] > len(macd) - viewing_window:
-            plt.scatter(sell_signals[i][0] - (len(macd) - viewing_window), sell_signals[i][1], c='red')
+            if not plotted_sell_label:
+                plt.scatter(sell_signals[i][0] - (len(macd) - viewing_window), sell_signals[i][1], 
+                            c='red', label='Sell Signal')
+                plotted_sell_label = True
+            else:
+                plt.scatter(sell_signals[i][0] - (len(macd) - viewing_window), sell_signals[i][1], 
+                            c='red')
         
     plt.legend()
     
@@ -1695,7 +1725,5 @@ def plot_macd(fast_period, slow_period, macd_ema_period, viewing_window,
         plt.title('MACD')
         plt.legend()
     plt.show()
-
-
 
 
